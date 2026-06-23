@@ -245,9 +245,6 @@ export function PersonalPage(initialTab) {
   // ─── MODALS ───
 
   function showNewPersonalProject() {
-    if (getPersonalProjects().length >= 2) {
-      return showToast('Máximo 2 proyectos personales en la versión demo', 'warning');
-    }
     const goals = DB.getGoals().filter(g => g.status !== 'achieved');
     showModal('Nuevo Proyecto Personal', `
       <div class="form-group"><label>Nombre *</label><input type="text" id="ppName" class="form-input" autofocus></div>

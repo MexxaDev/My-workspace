@@ -170,7 +170,6 @@ function showForm(type) {
       action: () => {
         const name = document.getElementById('qcClientName')?.value.trim();
         if (!name) return showToast('El nombre es obligatorio', 'warning');
-        if (DB.count('clients') >= 1) return showToast('Solo podés tener 1 cliente en la versión demo', 'warning');
         const client = DB.create('clients', {
           archived: false,
           name,
@@ -212,7 +211,6 @@ function showForm(type) {
         const name = document.getElementById('qcProjName')?.value.trim();
         if (!name) return showToast('El nombre es obligatorio', 'warning');
         const clientId = document.getElementById('qcProjClient')?.value || null;
-        if (!clientId && DB.getPersonalProjects().length >= 2) return showToast('Máximo 2 proyectos personales en la versión demo', 'warning');
         const project = DB.create('projects', {
           clientId,
           workspace: clientId ? 'client' : 'personal',
