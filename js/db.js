@@ -1,0 +1,806 @@
+import { Utils } from './utils.js';
+
+const DB_VERSION = '3.0.0';
+
+const STORES = [
+  'clients', 'projects',
+  'campaigns', 'contents', 'tasks', 'events', 'meetings', 'prompts',
+  'objectives', 'planner', 'files', 'notes', 'history',
+  'visions', 'goals'
+];
+
+const PROFILE_KEY = 'levitar_profile';
+
+const XP_REWARDS = {
+  easy: 15,
+  medium: 35,
+  hard: 80,
+  epic: 160,
+  task_complete: 15,
+  project_complete: 350,
+  objective_complete: 750,
+  goal_complete: 1500,
+  vision_complete: 5000,
+  streak_7: 300,
+  streak_30: 1500
+};
+
+function getDefaultProfile() {
+  return {
+    name: 'Usuario',
+    occupation: null,
+    occupationCustom: '',
+    topics: [],
+    purpose: [],
+    onboardingComplete: false,
+    level: 0,
+    xp: 0,
+    streak: 0,
+    lastActivityDate: null,
+    achievements: []
+  };
+}
+
+export const OCCUPATIONS = [
+  { id: 'designer', label: 'Diseñador UX/UI', icon: '🎨' },
+  { id: 'developer', label: 'Desarrollador', icon: '💻' },
+  { id: 'marketer', label: 'Marketer / Community Manager', icon: '📊' },
+  { id: 'entrepreneur', label: 'Emprendedor', icon: '🚀' },
+  { id: 'creative', label: 'Creativo / Artista', icon: '✨' },
+  { id: 'student', label: 'Estudiante', icon: '🎓' },
+  { id: 'other', label: 'Otro', icon: '✏️' }
+];
+
+export const TOPICS = [
+  { id: 'design', label: 'Diseño & Creatividad', icon: '🎨' },
+  { id: 'tech', label: 'Tecnología & Desarrollo', icon: '💻' },
+  { id: 'fitness', label: 'Fitness & Salud', icon: '💪' },
+  { id: 'finance', label: 'Finanzas & Negocios', icon: '💰' },
+  { id: 'productivity', label: 'Productividad & Organización', icon: '⚡' }
+];
+
+export const PURPOSES = [
+  { id: 'organize', label: 'Organizar mi vida profesional' },
+  { id: 'track_projects', label: 'Hacer seguimiento de proyectos' },
+  { id: 'habits', label: 'Desarrollar hábitos y rutinas' },
+  { id: 'manage_clients', label: 'Gestionar clientes y campañas' },
+  { id: 'all', label: 'Todo lo anterior' }
+];
+
+function calculateLevel(xp) {
+  return Math.floor(Math.pow(xp / 100, 0.48));
+}
+
+function xpForLevel(level) {
+  return Math.floor(100 * Math.pow(level, 2.08));
+}
+
+export const DB = {
+  _ready: false,
+
+  init() {
+    this._migrateIfNeeded();
+    STORES.forEach(store => {
+      if (!localStorage.getItem(`levitar_${store}`)) {
+        localStorage.setItem(`levitar_${store}`, JSON.stringify([]));
+      }
+    });
+    this._ready = true;
+  },
+
+  _migrateIfNeeded() {
+    const storedVersion = localStorage.getItem('levitar_db_version');
+    if (storedVersion === DB_VERSION) return;
+
+    if (!storedVersion || storedVersion < '3.0.0') {
+      this._migrateToV3();
+    }
+
+    localStorage.setItem('levitar_db_version', DB_VERSION);
+  },
+
+  _migrateToV3() {
+    const profile = this.getProfile();
+    if (profile.level === undefined) {
+      profile.level = 1;
+      profile.xp = 0;
+      profile.streak = 0;
+      profile.lastActivityDate = null;
+      profile.achievements = profile.achievements || [];
+      this.saveProfile(profile);
+    }
+
+    const tasks = this._getStore('tasks');
+    let changed = false;
+    tasks.forEach(t => {
+      if (t.difficulty === undefined) {
+        t.difficulty = 'medium';
+        changed = true;
+      }
+    });
+    if (changed) this._setStore('tasks', tasks);
+
+    const objectives = this._getStore('objectives');
+    let objChanged = false;
+    objectives.forEach(o => {
+      if (o.goalId === undefined) {
+        o.goalId = null;
+        objChanged = true;
+      }
+    });
+    if (objChanged) this._setStore('objectives', objectives);
+
+    const projects = this._getStore('projects');
+    let projChanged = false;
+    projects.forEach(p => {
+      if (p.goalId === undefined) {
+        p.goalId = null;
+        projChanged = true;
+      }
+    });
+    if (projChanged) this._setStore('projects', projects);
+  },
+
+  _getStore(store) {
+    try {
+      return JSON.parse(localStorage.getItem(`levitar_${store}`)) || [];
+    } catch {
+      return [];
+    }
+  },
+
+  _setStore(store, data) {
+    localStorage.setItem(`levitar_${store}`, JSON.stringify(data));
+  },
+
+  _notify(store, action) {
+    const event = new CustomEvent('levitar:change', {
+      detail: { store, action }
+    });
+    document.dispatchEvent(event);
+  },
+
+  // ─── CRUD ───
+
+  create(store, data) {
+    const list = this._getStore(store);
+    const now = new Date().toISOString();
+    const item = {
+      ...data,
+      id: Utils.generateId(),
+      createdAt: now,
+      updatedAt: now
+    };
+    list.push(item);
+    this._setStore(store, list);
+    this._notify(store, 'create');
+    return item;
+  },
+
+  getAll(store) {
+    return this._getStore(store);
+  },
+
+  getById(store, id) {
+    return this._getStore(store).find(item => item.id === id) || null;
+  },
+
+  where(store, predicate) {
+    return this._getStore(store).filter(predicate);
+  },
+
+  update(store, id, data) {
+    const list = this._getStore(store);
+    const idx = list.findIndex(item => item.id === id);
+    if (idx === -1) return null;
+    list[idx] = { ...list[idx], ...data, updatedAt: new Date().toISOString() };
+    this._setStore(store, list);
+    this._notify(store, 'update');
+    return list[idx];
+  },
+
+  remove(store, id) {
+    const list = this._getStore(store);
+    const idx = list.findIndex(item => item.id === id);
+    if (idx === -1) return false;
+    list.splice(idx, 1);
+    this._setStore(store, list);
+    this._notify(store, 'delete');
+    return true;
+  },
+
+  removeWhere(store, predicate) {
+    const list = this._getStore(store);
+    const remaining = list.filter(item => !predicate(item));
+    this._setStore(store, remaining);
+    this._notify(store, 'delete');
+    return remaining;
+  },
+
+  count(store) {
+    return this._getStore(store).length;
+  },
+
+  // ─── SEARCH ───
+
+  search(store, query, fields = ['name', 'title']) {
+    const list = this._getStore(store);
+    const q = query.toLowerCase();
+    return list.filter(item =>
+      fields.some(f => item[f] && item[f].toLowerCase().includes(q))
+    );
+  },
+
+  // ─── ARCHIVE ───
+
+  archive(store, id) {
+    return this.update(store, id, { archived: true });
+  },
+
+  restore(store, id) {
+    return this.update(store, id, { archived: false });
+  },
+
+  getActive(store) {
+    return this._getStore(store).filter(item => !item.archived);
+  },
+
+  getArchived(store) {
+    return this._getStore(store).filter(item => item.archived);
+  },
+
+  // ─── PROJECT HELPERS ───
+
+  getActiveProjects() {
+    return this._getStore('projects').filter(p => !p.archived && p.status !== 'completed');
+  },
+
+  getClientProjects(clientId) {
+    return this._getStore('projects').filter(p => p.clientId === clientId && !p.archived);
+  },
+
+  getPersonalProjects() {
+    return this._getStore('projects').filter(p => p.workspace === 'personal' && !p.archived);
+  },
+
+  getProjectContents(projectId) {
+    const related = {};
+    ['campaigns', 'contents', 'tasks', 'events', 'meetings', 'prompts',
+     'objectives', 'planner', 'files', 'notes', 'history'].forEach(store => {
+      related[store] = this.where(store, item => item.projectId === projectId);
+    });
+    return related;
+  },
+
+  deleteProject(projectId) {
+    ['campaigns', 'contents', 'tasks', 'events', 'meetings', 'prompts',
+     'objectives', 'planner', 'files', 'notes', 'history'].forEach(store => {
+      this.removeWhere(store, item => item.projectId === projectId);
+    });
+    return this.remove('projects', projectId);
+  },
+
+  deleteClient(clientId) {
+    const projects = this.where('projects', p => p.clientId === clientId);
+    projects.forEach(p => this.deleteProject(p.id));
+    return this.remove('clients', clientId);
+  },
+
+  // ─── HISTORY ───
+
+  createHistoryEntry(action, entityType, entityId, metadata = {}) {
+    return this.create('history', {
+      projectId: metadata.projectId || null,
+      workspace: metadata.workspace || 'client',
+      action,
+      entityType,
+      entityId,
+      metadata
+    });
+  },
+
+  // ─── PERSONAL ITEMS ───
+
+  getPersonalItems(store) {
+    return this._getStore(store).filter(item => item.workspace === 'personal');
+  },
+
+  // ─── VISION HIERARCHY ───
+
+  getVisions() {
+    return this._getStore('visions');
+  },
+
+  createVision(data) {
+    return this.create('visions', {
+      ...data,
+      status: data.status || 'active'
+    });
+  },
+
+  getVisionProgress(visionId) {
+    const goals = this.where('goals', g => g.visionId === visionId);
+    if (goals.length === 0) return { done: 0, total: 0, percent: 0 };
+    const done = goals.filter(g => g.status === 'achieved').length;
+    return { done, total: goals.length, percent: Math.round((done / goals.length) * 100) };
+  },
+
+  deleteVision(visionId) {
+    const goals = this.where('goals', g => g.visionId === visionId);
+    goals.forEach(g => this.deleteGoal(g.id));
+    return this.remove('visions', visionId);
+  },
+
+  // ─── GOAL HIERARCHY ───
+
+  getGoals(visionId) {
+    if (visionId) return this.where('goals', g => g.visionId === visionId);
+    return this._getStore('goals');
+  },
+
+  getGoalsByStatus(status) {
+    return this.where('goals', g => g.status === status);
+  },
+
+  createGoal(data) {
+    return this.create('goals', {
+      ...data,
+      status: data.status || 'pending'
+    });
+  },
+
+  getGoalProgress(goalId) {
+    const objectives = this.where('objectives', o => o.goalId === goalId);
+    if (objectives.length === 0) return { done: 0, total: 0, percent: 0 };
+    const done = objectives.filter(o => o.status === 'achieved').length;
+    return { done, total: objectives.length, percent: Math.round((done / objectives.length) * 100) };
+  },
+
+  deleteGoal(goalId) {
+    const objectives = this.where('objectives', o => o.goalId === goalId);
+    objectives.forEach(o => {
+      this.removeWhere('tasks', t => t.objectiveId === o.id);
+    });
+    this.removeWhere('objectives', o => o.goalId === goalId);
+    this.removeWhere('projects', p => p.goalId === goalId);
+    return this.remove('goals', goalId);
+  },
+
+  getActiveGoals() {
+    return this.where('goals', g => g.status === 'in_progress' || g.status === 'pending');
+  },
+
+  // ─── OBJECTIVE HELPERS ───
+
+  getTasksByObjective(objectiveId) {
+    return this._getStore('tasks').filter(t => t.objectiveId === objectiveId);
+  },
+
+  getObjectiveProgress(objectiveId) {
+    const tasks = this.getTasksByObjective(objectiveId);
+    if (tasks.length === 0) return { done: 0, total: 0, percent: 0 };
+    const done = tasks.filter(t => t.status === 'done').length;
+    return { done, total: tasks.length, percent: Math.round((done / tasks.length) * 100) };
+  },
+
+  // ─── TASK COMPLETION ───
+
+  completeTask(taskId) {
+    const task = this.getById('tasks', taskId);
+    if (!task) return null;
+
+    const updated = this.update('tasks', taskId, {
+      status: 'done',
+      completedAt: new Date().toISOString()
+    });
+
+    const difficulty = task.difficulty || 'medium';
+    this._awardXP(XP_REWARDS[difficulty] || XP_REWARDS.medium);
+    this._updateStreak();
+
+    if (task.objectiveId) {
+      const prog = this.getObjectiveProgress(task.objectiveId);
+      if (prog.total > 0 && prog.percent === 100) {
+        const obj = this.getById('objectives', task.objectiveId);
+        if (obj) {
+          this.update('objectives', task.objectiveId, { status: 'achieved' });
+          this._awardXP(XP_REWARDS.objective_complete);
+          this.createHistoryEntry('complete', 'objective', task.objectiveId, {
+            projectId: task.projectId, workspace: task.workspace || 'client',
+            name: obj.title
+          });
+          if (obj.goalId) {
+            const gProg = this.getGoalProgress(obj.goalId);
+            if (gProg.total > 0 && gProg.percent === 100) {
+              this.update('goals', obj.goalId, { status: 'achieved' });
+              this._awardXP(XP_REWARDS.goal_complete);
+              const goal = this.getById('goals', obj.goalId);
+              this.createHistoryEntry('complete', 'goal', obj.goalId, {
+                name: goal ? goal.title : ''
+              });
+              if (goal && goal.visionId) {
+                const vProg = this.getVisionProgress(goal.visionId);
+                if (vProg.total > 0 && vProg.percent === 100) {
+                  this.update('visions', goal.visionId, { status: 'achieved' });
+                  this._awardXP(XP_REWARDS.vision_complete);
+                }
+              }
+            }
+          }
+        }
+      } else if (prog.total > 0) {
+        this.update('objectives', task.objectiveId, { status: 'in_progress' });
+      }
+    }
+
+    return updated;
+  },
+
+  uncompleteTask(taskId) {
+    return this.update('tasks', taskId, { status: 'todo', completedAt: null });
+  },
+
+  finalizeTask(taskId) {
+    const task = this.getById('tasks', taskId);
+    if (!task || task.status !== 'done') return null;
+
+    const updated = this.update('tasks', taskId, {
+      status: 'finalized',
+      finalizedAt: new Date().toISOString()
+    });
+
+    this._awardXP(XP_REWARDS.task_complete);
+    this._updateStreak();
+    this.createHistoryEntry('finalize', 'task', taskId, {
+      projectId: task.projectId,
+      workspace: task.workspace || 'client',
+      name: task.title
+    });
+
+    return updated;
+  },
+
+  // ─── GAMIFICATION ───
+
+  getProfile() {
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY);
+      if (!raw) return getDefaultProfile();
+      const parsed = JSON.parse(raw);
+      return { ...getDefaultProfile(), ...parsed };
+    } catch {
+      return getDefaultProfile();
+    }
+  },
+
+  saveProfile(profile) {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  },
+
+  _awardXP(amount) {
+    const profile = this.getProfile();
+    profile.xp += amount;
+    const newLevel = calculateLevel(profile.xp);
+    if (newLevel > profile.level) {
+      profile.level = newLevel;
+      this.createHistoryEntry('level_up', 'user', '', { level: newLevel });
+    }
+    this.saveProfile(profile);
+    return profile;
+  },
+
+  _updateStreak() {
+    const profile = this.getProfile();
+    const today = new Date().toISOString().split('T')[0];
+
+    if (profile.lastActivityDate === today) return profile;
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    if (profile.lastActivityDate === yesterdayStr) {
+      profile.streak += 1;
+    } else if (profile.lastActivityDate !== today) {
+      profile.streak = 1;
+    }
+
+    if (profile.streak === 7) {
+      this._awardXP(XP_REWARDS.streak_7);
+      this._addAchievement('streak_7', 'Racha de 7 días');
+    }
+    if (profile.streak === 30) {
+      this._awardXP(XP_REWARDS.streak_30);
+      this._addAchievement('streak_30', 'Racha de 30 días');
+    }
+
+    profile.lastActivityDate = today;
+    this.saveProfile(profile);
+    return profile;
+  },
+
+  _addAchievement(id, name) {
+    const profile = this.getProfile();
+    if (!profile.achievements.some(a => a.id === id)) {
+      profile.achievements.push({ id, name, unlockedAt: new Date().toISOString() });
+      this.saveProfile(profile);
+      this.createHistoryEntry('achievement', 'achievement', id, { name });
+    }
+  },
+
+  getXPToNextLevel() {
+    const profile = this.getProfile();
+    const level = profile.level || 0;
+    const currentLevelXp = xpForLevel(level);
+    const nextLevelXp = xpForLevel(level + 1);
+    return {
+      current: profile.xp - currentLevelXp,
+      needed: nextLevelXp - currentLevelXp,
+      total: nextLevelXp - currentLevelXp,
+      percent: Math.max(0, Math.round(((profile.xp - currentLevelXp) / (nextLevelXp - currentLevelXp)) * 100))
+    };
+  },
+
+  getStreakInfo() {
+    const profile = this.getProfile();
+    return {
+      streak: profile.streak,
+      level: profile.level,
+      xp: profile.xp,
+      achievements: profile.achievements
+    };
+  },
+
+  calculateTaskDifficultyFromTitle(title) {
+    const t = title.toLowerCase();
+    if (t.includes('fácil') || t.includes('rapido') || t.includes('rápido') || t.includes('simple')) return 'easy';
+    if (t.includes('difícil') || t.includes('dificil') || t.includes('complejo') || t.includes('compleja')) return 'hard';
+    if (t.includes('épico') || t.includes('epico') || t.includes('grande') || t.includes('masivo')) return 'epic';
+    return 'medium';
+  },
+
+  // ─── TASK QUERIES ───
+
+  getTasksDueToday() {
+    const today = new Date().toISOString().split('T')[0];
+    return this._getStore('tasks').filter(t => t.dueDate && t.dueDate === today && t.status !== 'done' && t.status !== 'finalized');
+  },
+
+  getTasksOverdue() {
+    const today = new Date().toISOString().split('T')[0];
+    return this._getStore('tasks').filter(t => t.dueDate && t.dueDate < today && t.status !== 'done' && t.status !== 'finalized');
+  },
+
+  getTasksUpcoming(days = 7) {
+    const today = new Date();
+    const future = new Date(today);
+    future.setDate(future.getDate() + days);
+    const todayStr = today.toISOString().split('T')[0];
+    const futureStr = future.toISOString().split('T')[0];
+    return this._getStore('tasks').filter(t =>
+      t.dueDate && t.dueDate >= todayStr && t.dueDate <= futureStr && t.status !== 'done' && t.status !== 'finalized'
+    );
+  },
+
+  // ─── DAILY MISSIONS ───
+
+  getDailyMissions() {
+    const today = new Date().toISOString().split('T')[0];
+    const raw = localStorage.getItem('levitar_daily_missions');
+    let data;
+    if (raw) {
+      try { data = JSON.parse(raw); } catch { data = null; }
+    }
+    if (data && data.date === today) return data.missions;
+
+    const rotatingMissions = [
+      { id: 'rotate_1', label: 'Crear 1 nota con ideas', check: () => { const today2 = new Date().toISOString().split('T')[0]; return this._getStore('notes').filter(n => n.createdAt && n.createdAt.startsWith(today2) && n.tags && n.tags.includes('ideas')).length >= 1; }, xp: 20 },
+      { id: 'rotate_2', label: 'Mover 1 tarea a completada', check: () => { const today2 = new Date().toISOString().split('T')[0]; return this._getStore('tasks').filter(t => t.completedAt && t.completedAt.startsWith(today2)).length >= 1; }, xp: 20 },
+      { id: 'rotate_3', label: 'Revisar proyectos activos', check: () => false, xp: 20, manual: true },
+      { id: 'rotate_4', label: 'Agregar 1 evento al calendario', check: () => { const today2 = new Date().toISOString().split('T')[0]; return this._getStore('events').filter(e => e.createdAt && e.createdAt.startsWith(today2)).length >= 1; }, xp: 20 },
+    ];
+    const rotIdx = new Date().getDate() % rotatingMissions.length;
+    const rot = rotatingMissions[rotIdx];
+
+    const missions = [
+      { id: 'login', label: 'Iniciar sesión', xp: 10, auto: true, done: false },
+      { id: 'complete_tasks', label: 'Completar 3 tareas', xp: 25, done: false },
+      { id: 'review_projects', label: 'Revisar proyectos activos', xp: 15, manual: true, done: false },
+      { id: 'add_note', label: 'Agregar 1 nota', xp: 15, done: false },
+      { id: rot.id, label: rot.label, xp: rot.xp, done: false, manual: rot.manual, rotLabel: 'Rotativa' },
+    ];
+
+    data = { date: today, missions };
+    localStorage.setItem('levitar_daily_missions', JSON.stringify(data));
+    return missions;
+  },
+
+  completeMission(missionId) {
+    const today = new Date().toISOString().split('T')[0];
+    const raw = localStorage.getItem('levitar_daily_missions');
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.date !== today) return;
+    const mission = data.missions.find(m => m.id === missionId);
+    if (!mission || mission.done) return;
+    mission.done = true;
+    localStorage.setItem('levitar_daily_missions', JSON.stringify(data));
+    this._awardXP(mission.xp);
+    this._notify('missions', 'complete');
+
+    const allDone = data.missions.every(m => m.done);
+    if (allDone) {
+      this._awardXP(50);
+      this._addAchievement('all_missions', 'Completaste todas las misiones del día');
+    }
+
+    const profile = this.getProfile();
+    if (profile.streak >= 7) {
+      const has7 = profile.achievements.some(a => a.id === 'missions_streak_7');
+      if (!has7 && allDone) {
+        this._awardXP(100);
+        this._addAchievement('missions_streak_7', 'Racha de 7 días de misiones');
+      }
+    }
+    if (profile.streak >= 30) {
+      const has30 = profile.achievements.some(a => a.id === 'missions_streak_30');
+      if (!has30 && allDone) {
+        this._awardXP(500);
+        this._addAchievement('missions_streak_30', 'Racha de 30 días de misiones');
+      }
+    }
+  },
+
+  refreshMissionsState() {
+    const missions = this.getDailyMissions();
+    const today = new Date().toISOString().split('T')[0];
+
+    const loginMission = missions.find(m => m.id === 'login');
+    if (loginMission && !loginMission.done) {
+      loginMission.done = true;
+      this._awardXP(loginMission.xp);
+    }
+
+    const completeTaskMission = missions.find(m => m.id === 'complete_tasks');
+    if (completeTaskMission && !completeTaskMission.done) {
+      const doneToday = this._getStore('tasks').filter(t => t.completedAt && t.completedAt.startsWith(today)).length;
+      if (doneToday >= 3) {
+        completeTaskMission.done = true;
+        this._awardXP(completeTaskMission.xp);
+      }
+    }
+
+    const addNoteMission = missions.find(m => m.id === 'add_note');
+    if (addNoteMission && !addNoteMission.done) {
+      const notesToday = this._getStore('notes').filter(n => n.createdAt && n.createdAt.startsWith(today)).length;
+      if (notesToday >= 1) {
+        addNoteMission.done = true;
+        this._awardXP(addNoteMission.xp);
+      }
+    }
+
+    const rotateMission = missions.find(m => m.id && m.id.startsWith('rotate_'));
+    if (rotateMission && !rotateMission.done && !rotateMission.manual) {
+      if (rotateMission.check && rotateMission.check()) {
+        rotateMission.done = true;
+        this._awardXP(rotateMission.xp);
+      }
+    }
+
+    const raw = localStorage.getItem('levitar_daily_missions');
+    if (raw) {
+      const data = JSON.parse(raw);
+      data.missions = missions;
+      localStorage.setItem('levitar_daily_missions', JSON.stringify(data));
+    }
+  },
+
+  getMissionsProgress() {
+    const missions = this.getDailyMissions();
+    const done = missions.filter(m => m.done).length;
+    const total = missions.length;
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { done, total, percent };
+  },
+
+  // ─── DAILY CHECK-IN ───
+
+  isTodayCheckedIn() {
+    const today = new Date().toISOString().split('T')[0];
+    const raw = localStorage.getItem('levitar_checkin');
+    if (!raw) return false;
+    try {
+      const data = JSON.parse(raw);
+      return data.log && data.log.includes(today);
+    } catch { return false; }
+  },
+
+  performCheckIn() {
+    const today = new Date().toISOString().split('T')[0];
+    let raw = localStorage.getItem('levitar_checkin');
+    let data;
+    if (raw) {
+      try { data = JSON.parse(raw); } catch { data = null; }
+    }
+    if (!data || !data.log) data = { log: [], streak: 0 };
+
+    if (data.log.includes(today)) return null;
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    if (data.log.length > 0 && data.log[data.log.length - 1] === yesterdayStr) {
+      data.streak += 1;
+    } else if (data.log.length > 0 && data.log[data.log.length - 1] !== today) {
+      data.streak = 1;
+    } else if (data.log.length === 0) {
+      data.streak = 1;
+    }
+
+    data.log.push(today);
+    localStorage.setItem('levitar_checkin', JSON.stringify(data));
+
+    const profile = this.getProfile();
+    const xpInfo = this.getXPToNextLevel();
+    const baseXP = Math.max(10, Math.floor(xpInfo.total * 0.10));
+    let bonus = 0;
+    if (data.streak > 0 && data.streak % 3 === 0) {
+      bonus = Math.floor(baseXP * 0.20);
+    }
+    const totalXP = baseXP + bonus;
+
+    this._awardXP(totalXP);
+
+    return {
+      xp: baseXP,
+      bonus,
+      total: totalXP,
+      streak: data.streak,
+      level: profile.level
+    };
+  },
+
+  getCheckInData() {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+
+    const raw = localStorage.getItem('levitar_checkin');
+    let log = [];
+    if (raw) {
+      try { const d = JSON.parse(raw); log = d.log || []; } catch { log = []; }
+    }
+
+    const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const week = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      week.push({
+        date: dateStr,
+        dayName: DAY_LABELS[d.getDay()],
+        checkedIn: log.includes(dateStr),
+        isToday: dateStr === today.toISOString().split('T')[0]
+      });
+    }
+
+    return week;
+  },
+
+  // ─── READY ───
+
+  isOnboardingRequired() {
+    const profile = this.getProfile();
+    const hasData = this.count('clients') > 0 || this.count('tasks') > 0;
+    if (hasData) return false;
+    return !profile.onboardingComplete || profile.name === 'Usuario';
+  },
+
+  isReady() {
+    return this._ready;
+  }
+};

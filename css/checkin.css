@@ -1,0 +1,316 @@
+.checkin-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 19000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  animation: checkinFadeIn 0.35s ease both;
+  padding: 24px;
+}
+
+#checkinContainer.closing .checkin-overlay {
+  animation: checkinFadeOut 0.3s ease both;
+}
+
+#checkinContainer.closing .checkin-popup {
+  animation: checkinScaleOut 0.3s ease both;
+}
+
+@keyframes checkinFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes checkinFadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes checkinScaleOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.92); }
+}
+
+.checkin-popup {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-2xl);
+  padding: 28px 24px 20px;
+  text-align: center;
+  animation: checkinPop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  overflow: hidden;
+}
+
+@keyframes checkinPop {
+  from { opacity: 0; transform: scale(0.85) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.checkin-glow {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, var(--accent-soft) 0%, transparent 70%);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.checkin-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.checkin-icon {
+  font-size: 36px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.checkin-header h2 {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.checkin-week {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.checkin-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 36px;
+}
+
+.checkin-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface-secondary);
+  border: 2px solid var(--border);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.checkin-day.done .checkin-dot {
+  background: var(--success);
+  border-color: var(--success);
+  box-shadow: 0 0 0 4px var(--success-soft);
+}
+
+.checkin-day.today .checkin-dot {
+  background: var(--warning);
+  border-color: var(--warning);
+  box-shadow: 0 0 0 4px var(--warning-soft);
+  animation: todayPulse 2s ease-in-out infinite;
+}
+
+@keyframes todayPulse {
+  0%, 100% { box-shadow: 0 0 0 4px var(--warning-soft); }
+  50% { box-shadow: 0 0 0 8px var(--warning-soft); }
+}
+
+.checkin-day.done .checkin-dot::after {
+  content: '✓';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.checkin-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.checkin-streak {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.checkin-fire {
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* ── Coin animation ── */
+.checkin-coin-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  height: 56px;
+  z-index: 1;
+}
+
+.checkin-coin {
+  font-size: 48px;
+  line-height: 1;
+  transform: translateY(-40px) scale(0.3);
+  opacity: 0;
+  transition: none;
+}
+
+.checkin-coin.animate {
+  animation: coinDrop 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes coinDrop {
+  0% { transform: translateY(-60px) scale(0.3) rotate(-20deg); opacity: 0; }
+  50% { transform: translateY(0) scale(1.2) rotate(10deg); opacity: 1; }
+  70% { transform: translateY(-6px) scale(1) rotate(-5deg); }
+  85% { transform: translateY(0) scale(1.05); }
+  100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+.checkin-sparkles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sparkle {
+  position: absolute;
+  font-size: 18px;
+  color: var(--warning);
+  opacity: 0;
+}
+
+.checkin-sparkles.animate .sparkle {
+  animation: sparkleBurst 0.8s ease forwards;
+}
+
+.s1 { top: 0; left: 30%; }
+.s2 { top: 10%; right: 20%; }
+.s3 { bottom: 0; left: 50%; }
+
+@keyframes sparkleBurst {
+  0% { opacity: 0; transform: scale(0) translateY(0); }
+  40% { opacity: 1; transform: scale(1.2) translateY(-12px); }
+  100% { opacity: 0; transform: scale(0.5) translateY(-24px); }
+}
+
+/* ── XP display ── */
+.checkin-xp-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.checkin-xp-value {
+  font-size: var(--text-lg);
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.checkin-bonus-badge {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--success);
+  background: var(--success-soft);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+}
+
+.checkin-total {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Level progress ── */
+.checkin-level {
+  background: var(--surface-secondary);
+  border-radius: var(--radius-xl);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.checkin-level-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.checkin-next {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.checkin-level .progress-bar {
+  height: 6px;
+  margin-bottom: 6px;
+}
+
+.checkin-level-xp {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.checkin-close {
+  width: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .checkin-popup {
+    padding: 24px 18px 16px;
+  }
+  .checkin-dot {
+    width: 28px;
+    height: 28px;
+  }
+  .checkin-day {
+    min-width: 30px;
+  }
+}
