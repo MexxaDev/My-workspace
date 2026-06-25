@@ -84,7 +84,7 @@ function init() {
     const item = findItem(actionBtn);
     if (!item) return;
 
-    const id = item.dataset.clientId || item.dataset.taskId || item.dataset.noteId;
+    const id = item.dataset.clientId || item.dataset.taskId || item.dataset.noteId || item.dataset.id;
     const matched = Object.values(handlers).filter(h => item.closest(h.itemSelector));
 
     item.style.transition = 'transform 0.2s ease, opacity 0.2s ease';

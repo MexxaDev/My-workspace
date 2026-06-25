@@ -6,11 +6,15 @@ import { showToast } from '../components/Toast.js';
 import { CalendarGrid } from '../components/Calendar.js';
 import { initKanbanDrag } from '../components/Kanban.js';
 import { addSwipeTarget } from '../components/SwipeToDelete.js';
+import { EditorialCalendar } from '../components/EditorialCalendar.js';
+import { showBrandKit } from '../components/BrandKit.js';
+import { showContentForm } from '../components/ContentForm.js';
 
 const TABS = [
   { id: 'overview', label: 'Resumen' },
   { id: 'trabajo', label: 'Trabajo' },
   { id: 'tareas', label: 'Tareas' },
+  { id: 'editorial', label: 'Editorial' },
   { id: 'recursos', label: 'Recursos' },
   { id: 'actividad', label: 'Actividad' },
 ];
@@ -22,6 +26,16 @@ export function ProjectDetailPage(params) {
   let contentFilter = 'all';
   let campaignFilter = 'all';
   let promptFilter = 'all';
+  let editorialCal = null;
+
+  function confirmDelete(entityName, callback) {
+    showModal('Confirmar eliminación', `
+      <p style="color:var(--text-secondary);margin-bottom:16px">¿Estás seguro de que querés eliminar este ${entityName}?<br><strong>Esta acción no se puede deshacer.</strong></p>
+    `, [
+      { label: 'Cancelar', class: 'btn btn-secondary', action: cl => cl() },
+      { label: 'Eliminar', class: 'btn btn-danger', action: cl => { cl(); callback(); } }
+    ]);
+  }
 
   function getProject() {
     return DB.getById('projects', projectId);
@@ -204,9 +218,9 @@ export function ProjectDetailPage(params) {
   }
 
   function renderContent() {
-    const contents = DB.where('contents', c => c.projectId === projectId);
-    const filtered = contentFilter === 'all' ? contents : contents.filter(c => c.type === contentFilter);
-    const types = ['all', 'post', 'story', 'reel'];
+    const contents = DB.getContentItems(projectId);
+    const filtered = contentFilter === 'all' ? contents : contents.filter(c => (c.platform || c.type) === contentFilter);
+    const types = ['all', 'instagram', 'tiktok', 'facebook', 'linkedin'];
 
     return `
       <div class="page-enter" style="margin-top:16px">
@@ -223,22 +237,24 @@ export function ProjectDetailPage(params) {
           <div class="empty-state"><p style="color:var(--text-muted)">No hay contenido</p></div>
         ` : `
           <div class="card-grid">
-            ${filtered.map(c => `
+            ${filtered.map(c => {
+              const title = c.headline || c.hook || c.title || 'Sin título';
+              return `
               <div class="card" style="padding:16px">
                 <div style="display:flex;justify-content:space-between;align-items:start">
-                  <h4>${Utils.sanitize(c.title)}</h4>
+                  <h4>${Utils.sanitize(title)}</h4>
                   <div style="display:flex;gap:4px">
-                    <span class="tag tag-${c.type}">${Utils.statusLabel(c.type)}</span>
+                    <span class="tag tag-${c.platform || c.type}">${Utils.statusLabel(c.platform || c.type)}</span>
                     <span class="tag tag-${c.status}">${Utils.statusLabel(c.status)}</span>
                   </div>
                 </div>
-                <p style="color:var(--text-muted);font-size:var(--text-sm);margin-top:8px">${Utils.truncate(Utils.sanitize(c.description || ''), 100)}</p>
+                <p style="color:var(--text-muted);font-size:var(--text-sm);margin-top:8px">${Utils.truncate(Utils.sanitize(c.body || c.description || ''), 100)}</p>
                 <div style="display:flex;gap:4px;margin-top:8px">
                   <button class="btn btn-sm btn-ghost content-edit-btn" data-id="${c.id}">✏️</button>
                   <button class="btn btn-sm btn-ghost content-del-btn" data-id="${c.id}">✕</button>
                 </div>
-              </div>
-            `).join('')}
+              </div>`;
+            }).join('')}
           </div>
         `}
       </div>
@@ -353,7 +369,7 @@ export function ProjectDetailPage(params) {
                 </div>
                 <pre style="background:var(--bg-secondary);padding:12px;border-radius:6px;margin-top:8px;font-size:var(--text-sm);white-space:pre-wrap;color:var(--text-secondary)">${Utils.sanitize(p.content)}</pre>
                 <div style="display:flex;gap:4px;margin-top:8px">
-                  <button class="btn btn-sm btn-secondary copy-prompt-btn" data-content="${Utils.sanitize(p.content)}">📋 Copiar</button>
+                  <button class="btn btn-sm btn-secondary copy-prompt-btn" data-content="${p.content.replace(/"/g, '&quot;')}">📋 Copiar</button>
                   <button class="btn btn-sm btn-ghost prompt-del-btn" data-id="${p.id}">✕</button>
                 </div>
               </div>
@@ -527,7 +543,7 @@ export function ProjectDetailPage(params) {
                 ${colTasks.map(t => {
                   const obj = t.objectiveId ? DB.getById('objectives', t.objectiveId) : null;
                   const diff = t.difficulty || 'medium';
-                  const diffXp = { easy: 10, medium: 25, hard: 50, epic: 100 }[diff];
+                  const diffXp = DB.getXpForDifficulty(diff);
                   return `
                   <div class="kanban-item ${t.status === 'finalized' ? 'finalized' : ''}" draggable="${t.status !== 'finalized'}" data-task-id="${t.id}">
                     <div class="kanban-item-title">${Utils.sanitize(t.title)}</div>
@@ -552,6 +568,101 @@ export function ProjectDetailPage(params) {
     `;
   }
 
+  function renderEditorial() {
+    const contentItems = DB.getContentItems(projectId);
+    if (!editorialCal) {
+      editorialCal = EditorialCalendar({
+        projectId,
+        clientId,
+        onContentChange: () => reRender()
+      });
+    }
+    return `
+      <div class="page-enter" style="margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3>Editorial (${contentItems.length})</h3>
+          <div style="display:flex;gap:8px">
+            ${clientId ? '<button class="btn btn-sm btn-secondary" id="brandKitBtn">🎨 Brand Kit</button>' : ''}
+          </div>
+        </div>
+        <div id="editorialCalendarContainer">${editorialCal.render()}</div>
+        <div style="margin-top:24px">
+          <h3 style="margin-bottom:12px">📊 Reporte de contenido</h3>
+          ${renderContentReport()}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderContentReport() {
+    const items = DB.getContentItems(projectId);
+    const total = items.length;
+    if (total === 0) return '<p style="color:var(--text-muted)">Sin contenido creado aún</p>';
+
+    const published = items.filter(i => i.status === 'published').length;
+    const withAnalytics = items.filter(i => i.analytics && i.analytics.reach > 0).length;
+    const byPlatform = {};
+    const byObjective = {};
+    const byStatus = {};
+
+    items.forEach(i => {
+      byPlatform[i.platform] = (byPlatform[i.platform] || 0) + 1;
+      byObjective[i.objective] = (byObjective[i.objective] || 0) + 1;
+      byStatus[i.status] = (byStatus[i.status] || 0) + 1;
+    });
+
+    const totalReach = items.reduce((s, i) => s + (i.analytics?.reach || 0), 0);
+    const totalEngagement = items.reduce((s, i) => s + (i.analytics?.engagementRate || 0), 0);
+    const avgEr = items.filter(i => i.analytics?.engagementRate).length
+      ? (totalEngagement / items.filter(i => i.analytics?.engagementRate).length).toFixed(1)
+      : '—';
+
+    const platformLabels = { instagram: 'Instagram', tiktok: 'TikTok', facebook: 'Facebook', linkedin: 'LinkedIn' };
+    const objLabels = { awareness: 'Notoriedad', engagement: 'Engagement', conversion: 'Conversión', retention: 'Retención', education: 'Educación' };
+    const statusLabels = { idea: 'Idea', brief: 'Brief', writing: 'Redacción', design: 'Diseño', review: 'Revisión', approved: 'Aprobado', scheduled: 'Programado', published: 'Publicado' };
+
+    return `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">
+        <div class="stat-card"><div class="stat-label">Total contenidos</div><div class="stat-value">${total}</div></div>
+        <div class="stat-card"><div class="stat-label">Publicados</div><div class="stat-value">${published}</div></div>
+        <div class="stat-card"><div class="stat-label">Alcance total</div><div class="stat-value">${totalReach.toLocaleString()}</div></div>
+        <div class="stat-card"><div class="stat-label">Engagement Rate</div><div class="stat-value">${avgEr}%</div></div>
+        <div class="stat-card"><div class="stat-label">Con analytics</div><div class="stat-value">${withAnalytics}</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="card" style="padding:16px">
+          <h4 style="margin-bottom:8px;font-size:var(--text-sm)">Por plataforma</h4>
+          ${Object.entries(byPlatform).map(([k, v]) => `
+            <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:var(--text-sm)">
+              <span>${platformLabels[k] || k}</span>
+              <strong>${v}</strong>
+            </div>
+          `).join('')}
+        </div>
+        <div class="card" style="padding:16px">
+          <h4 style="margin-bottom:8px;font-size:var(--text-sm)">Por objetivo</h4>
+          ${Object.entries(byObjective).map(([k, v]) => `
+            <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:var(--text-sm)">
+              <span>${objLabels[k] || k}</span>
+              <strong>${v}</strong>
+            </div>
+          `).join('')}
+        </div>
+        <div class="card" style="padding:16px;grid-column:1/-1">
+          <h4 style="margin-bottom:8px;font-size:var(--text-sm)">Por estado</h4>
+          <div style="display:flex;flex-wrap:wrap;gap:12px">
+            ${Object.entries(byStatus).map(([k, v]) => `
+              <div style="display:flex;align-items:center;gap:6px;font-size:var(--text-sm)">
+                <span class="card-status-dot card-status-${k}"></span>
+                <span>${statusLabels[k] || k}: <strong>${v}</strong></span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderRecursos() {
     return `
       <div class="page-enter" style="margin-top:16px">
@@ -569,13 +680,13 @@ export function ProjectDetailPage(params) {
     return `
       <div class="page-enter" style="margin-top:16px">
         <div style="margin-bottom:8px">
+          ${renderCalendar()}
+        </div>
+        <div style="margin-bottom:8px">
           ${renderNotes()}
         </div>
         <div style="margin-bottom:8px">
           ${renderMeetings()}
-        </div>
-        <div style="margin-bottom:8px">
-          ${renderCalendar()}
         </div>
         <div>
           ${renderHistory()}
@@ -622,14 +733,21 @@ export function ProjectDetailPage(params) {
     showModal('Nuevo Contenido', `
       <div class="form-group"><label>Título</label><input type="text" id="contTitle" class="form-input" autofocus></div>
       <div class="form-group"><label>Descripción</label><textarea id="contDesc" class="form-input" rows="2"></textarea></div>
-      <div class="form-group"><label>Tipo</label><select id="contType" class="form-input"><option value="post">Post</option><option value="story">Historia</option><option value="reel">Reel</option></select></div>
-      <div class="form-group"><label>Estado</label><select id="contStatus" class="form-input"><option value="draft">Borrador</option><option value="published">Publicado</option></select></div>
+      <div class="form-group"><label>Plataforma</label><select id="contType" class="form-input"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="facebook">Facebook</option><option value="linkedin">LinkedIn</option></select></div>
+      <div class="form-group"><label>Estado</label><select id="contStatus" class="form-input"><option value="idea">Idea</option><option value="draft">Borrador</option><option value="published">Publicado</option></select></div>
     `, [
       { label: 'Cancelar', class: 'btn btn-secondary', action: c => c() },
       { label: 'Crear', class: 'btn btn-primary', action: c => {
         const title = document.getElementById('contTitle').value.trim();
         if (!title) return showToast('El título es obligatorio', 'warning');
-        DB.create('contents', { clientId, projectId, title, description: document.getElementById('contDesc').value.trim(), type: document.getElementById('contType').value, status: document.getElementById('contStatus').value });
+        DB.createContentItem({
+          clientId: clientId || null,
+          projectId,
+          headline: title,
+          body: document.getElementById('contDesc').value.trim(),
+          platform: document.getElementById('contType').value,
+          status: document.getElementById('contStatus').value
+        });
         showToast('Contenido creado', 'success'); c(); reRender();
       }}
     ]);
@@ -824,6 +942,7 @@ export function ProjectDetailPage(params) {
             ${activeTab === 'overview' ? renderOverview() : ''}
             ${activeTab === 'trabajo' ? renderTrabajo() : ''}
             ${activeTab === 'tareas' ? renderTareas() : ''}
+            ${activeTab === 'editorial' ? renderEditorial() : ''}
             ${activeTab === 'recursos' ? renderRecursos() : ''}
             ${activeTab === 'actividad' ? renderActividad() : ''}
           </div>
@@ -891,10 +1010,16 @@ export function ProjectDetailPage(params) {
           });
         });
         document.querySelectorAll('.campaign-del-btn').forEach(el => {
-          el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('campaigns', el.dataset.id); reRender(); });
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            confirmDelete('campaña', () => { DB.remove('campaigns', el.dataset.id); reRender(); });
+          });
         });
         document.querySelectorAll('.content-del-btn').forEach(el => {
-          el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('contents', el.dataset.id); reRender(); });
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            confirmDelete('contenido', () => { DB.remove('content_items', el.dataset.id); reRender(); });
+          });
         });
         document.querySelectorAll('.planner-del-btn').forEach(el => {
           el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('planner', el.dataset.id); reRender(); });
@@ -910,7 +1035,10 @@ export function ProjectDetailPage(params) {
           el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('events', el.dataset.id); reRender(); });
         });
         document.querySelectorAll('.task-del-btn').forEach(el => {
-          el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('tasks', el.dataset.id); reRender(); });
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            confirmDelete('tarea', () => { DB.remove('tasks', el.dataset.id); reRender(); });
+          });
         });
         document.querySelectorAll('.btn-finalize').forEach(el => {
           el.addEventListener('click', (e) => { e.stopPropagation(); DB.finalizeTask(el.dataset.id); reRender(); });
@@ -919,10 +1047,16 @@ export function ProjectDetailPage(params) {
           el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('files', el.dataset.id); reRender(); });
         });
         document.querySelectorAll('.prompt-del-btn').forEach(el => {
-          el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('prompts', el.dataset.id); reRender(); });
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            confirmDelete('prompt', () => { DB.remove('prompts', el.dataset.id); reRender(); });
+          });
         });
         document.querySelectorAll('.note-del-btn').forEach(el => {
-          el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('notes', el.dataset.id); reRender(); });
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            confirmDelete('nota', () => { DB.remove('notes', el.dataset.id); reRender(); });
+          });
         });
         document.querySelectorAll('.meeting-del-btn').forEach(el => {
           el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('meetings', el.dataset.id); reRender(); });
@@ -967,32 +1101,12 @@ export function ProjectDetailPage(params) {
         document.querySelectorAll('.content-edit-btn').forEach(el => {
           el.addEventListener('click', (e) => {
             e.stopPropagation();
-            const c = DB.getById('contents', el.dataset.id);
-            if (!c) return;
-            showModal('Editar Contenido', `
-              <div class="form-group"><label>Título</label><input type="text" id="editContTitle" class="form-input" value="${Utils.sanitize(c.title)}"></div>
-              <div class="form-group"><label>Descripción</label><textarea id="editContDesc" class="form-input" rows="2">${Utils.sanitize(c.description || '')}</textarea></div>
-              <div class="form-group"><label>Tipo</label><select id="editContType" class="form-input">
-                <option value="post" ${c.type === 'post' ? 'selected' : ''}>Post</option>
-                <option value="story" ${c.type === 'story' ? 'selected' : ''}>Historia</option>
-                <option value="reel" ${c.type === 'reel' ? 'selected' : ''}>Reel</option>
-              </select></div>
-              <div class="form-group"><label>Estado</label><select id="editContStatus" class="form-input">
-                <option value="draft" ${c.status === 'draft' ? 'selected' : ''}>Borrador</option>
-                <option value="published" ${c.status === 'published' ? 'selected' : ''}>Publicado</option>
-              </select></div>
-            `, [
-              { label: 'Cancelar', class: 'btn btn-secondary', action: cl => cl() },
-              { label: 'Guardar', class: 'btn btn-primary', action: cl => {
-                DB.update('contents', el.dataset.id, {
-                  title: document.getElementById('editContTitle').value.trim(),
-                  description: document.getElementById('editContDesc').value.trim(),
-                  type: document.getElementById('editContType').value,
-                  status: document.getElementById('editContStatus').value
-                });
-                showToast('Contenido actualizado', 'success'); cl(); reRender();
-              }}
-            ]);
+            showContentForm({
+              projectId,
+              clientId,
+              editItemId: el.dataset.id,
+              onSave: () => reRender()
+            });
           });
         });
 
@@ -1020,6 +1134,12 @@ export function ProjectDetailPage(params) {
           container.innerHTML = cal.render();
           cal.afterRender();
         }
+
+        // Editorial calendar
+        if (activeTab === 'editorial' && editorialCal) {
+          editorialCal.afterRender();
+        }
+        document.getElementById('brandKitBtn')?.addEventListener('click', () => showBrandKit(clientId));
 
         // Drag and drop for tasks
         if (activeTab === 'tareas') {

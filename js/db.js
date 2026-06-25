@@ -6,7 +6,8 @@ const STORES = [
   'clients', 'projects',
   'campaigns', 'contents', 'tasks', 'events', 'meetings', 'prompts',
   'objectives', 'planner', 'files', 'notes', 'history',
-  'visions', 'goals'
+  'visions', 'goals',
+  'content_items', 'brand_kits', 'content_analytics'
 ];
 
 const PROFILE_KEY = 'levitar_profile';
@@ -266,23 +267,33 @@ export const DB = {
   getProjectContents(projectId) {
     const related = {};
     ['campaigns', 'contents', 'tasks', 'events', 'meetings', 'prompts',
-     'objectives', 'planner', 'files', 'notes', 'history'].forEach(store => {
-      related[store] = this.where(store, item => item.projectId === projectId);
+     'objectives', 'planner', 'files', 'notes', 'history',
+     'content_items', 'content_analytics'].forEach(store => {
+      if (store === 'content_analytics') {
+        const ids = this.where('content_items', ci => ci.projectId === projectId).map(ci => ci.id);
+        related[store] = this.where(store, a => ids.includes(a.contentItemId));
+      } else {
+        related[store] = this.where(store, item => item.projectId === projectId);
+      }
     });
     return related;
   },
 
   deleteProject(projectId) {
     ['campaigns', 'contents', 'tasks', 'events', 'meetings', 'prompts',
-     'objectives', 'planner', 'files', 'notes', 'history'].forEach(store => {
+     'objectives', 'planner', 'files', 'notes', 'history',
+     'content_items'].forEach(store => {
       this.removeWhere(store, item => item.projectId === projectId);
     });
+    const contentIds = this.where('content_items', ci => ci.projectId === projectId).map(ci => ci.id);
+    contentIds.forEach(id => this.removeWhere('content_analytics', a => a.contentItemId === id));
     return this.remove('projects', projectId);
   },
 
   deleteClient(clientId) {
     const projects = this.where('projects', p => p.clientId === clientId);
     projects.forEach(p => this.deleteProject(p.id));
+    this.removeWhere('brand_kits', b => b.clientId === clientId);
     return this.remove('clients', clientId);
   },
 
@@ -789,6 +800,88 @@ export const DB = {
     }
 
     return week;
+  },
+
+  // ─── CONTENT ITEMS (Editorial) ───
+
+  getContentItems(projectId) {
+    return this._getStore('content_items').filter(c => c.projectId === projectId);
+  },
+
+  getContentItemsByDateRange(startDate, endDate) {
+    return this._getStore('content_items').filter(c => {
+      return c.scheduledDate && c.scheduledDate >= startDate && c.scheduledDate <= endDate;
+    });
+  },
+
+  getContentItemsByStatus(projectId, status) {
+    return this._getStore('content_items').filter(c => c.projectId === projectId && c.status === status);
+  },
+
+  createContentItem(data) {
+    return this.create('content_items', {
+      ...data,
+      objective: data.objective || '',
+      emotion: data.emotion || '',
+      hook: data.hook || '',
+      conversationStarter: data.conversationStarter || '',
+      desiredAction: data.desiredAction || '',
+      brandPerception: data.brandPerception || '',
+      headline: data.headline || '',
+      body: data.body || '',
+      cta: data.cta || '',
+      link: data.link || '',
+      visualDescription: data.visualDescription || '',
+      visualReference: data.visualReference || '',
+      colorPalette: data.colorPalette || [],
+      font: data.font || '',
+      status: data.status || 'idea',
+      platform: data.platform || 'instagram',
+      format: data.format || 'feed',
+      scheduledDate: data.scheduledDate || null,
+      scheduledTime: data.scheduledTime || null,
+      approvedBy: data.approvedBy || '',
+      feedback: data.feedback || '',
+      tags: data.tags || [],
+      series: data.series || '',
+      campaignId: data.campaignId || null,
+      analytics: data.analytics || null
+    });
+  },
+
+  updateContentAnalytics(contentItemId, analyticsData) {
+    const item = this.getById('content_items', contentItemId);
+    if (!item) return null;
+    return this.update('content_items', contentItemId, {
+      analytics: { ...(item.analytics || {}), ...analyticsData }
+    });
+  },
+
+  // ─── BRAND KITS ───
+
+  getBrandKit(clientId) {
+    return this._getStore('brand_kits').find(b => b.clientId === clientId) || null;
+  },
+
+  saveBrandKit(clientId, data) {
+    const existing = this.getBrandKit(clientId);
+    if (existing) {
+      return this.update('brand_kits', existing.id, data);
+    }
+    return this.create('brand_kits', { clientId, ...data });
+  },
+
+  // ─── CONTENT ANALYTICS ───
+
+  getAnalyticsForContent(contentItemId) {
+    return this.where('content_analytics', a => a.contentItemId === contentItemId);
+  },
+
+  // ─── XP HELPERS ───
+
+  getXpForDifficulty(difficulty) {
+    const map = { easy: 15, medium: 35, hard: 80, epic: 160 };
+    return map[difficulty] || 0;
   },
 
   // ─── READY ───

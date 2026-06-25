@@ -215,6 +215,17 @@ export function SettingsPage() {
           </div>
 
           <div class="settings-section">
+            <h3>Respaldar datos</h3>
+            <div class="card">
+              <div class="card-body">
+                <p style="margin-bottom:12px">Exportá todos tus datos como archivo JSON o importá una copia previa.</p>
+                <button class="btn btn-secondary" id="exportDataBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Exportar datos</button>
+                <button class="btn btn-secondary" id="importDataBtn" style="margin-left:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Importar datos</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
             <h3>Datos de demostración</h3>
             <div class="card">
               <div class="card-body">
@@ -296,6 +307,53 @@ export function SettingsPage() {
           soundBtn.textContent = on ? 'Activado' : 'Silenciado';
         });
       }
+
+      document.getElementById('exportDataBtn')?.addEventListener('click', () => {
+        const data = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key.startsWith('levitar_') && !['levitar_theme','levitar_sound','levitar_version'].includes(key)) {
+            try { data[key] = JSON.parse(localStorage.getItem(key)); } catch { data[key] = localStorage.getItem(key); }
+          }
+        }
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `my-workspace-backup-${Utils.today()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Datos exportados', 'success');
+      });
+
+      document.getElementById('importDataBtn')?.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              const data = JSON.parse(ev.target.result);
+              let count = 0;
+              for (const [key, value] of Object.entries(data)) {
+                if (key.startsWith('levitar_')) {
+                  localStorage.setItem(key, JSON.stringify(value));
+                  count++;
+                }
+              }
+              showToast(`${count} datos importados. Recargando...`, 'success');
+              setTimeout(() => window.location.reload(), 1000);
+            } catch {
+              showToast('Archivo inválido', 'error');
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      });
     }
   };
 }

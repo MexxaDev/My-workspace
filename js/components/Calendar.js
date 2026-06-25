@@ -1,6 +1,7 @@
 import { DB } from '../db.js';
 import { Utils } from '../utils.js';
 import { showModal } from './Modal.js';
+import { showToast } from './Toast.js';
 
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -57,40 +58,46 @@ export function CalendarGrid({ events, tasks, onNavigate, showSidebar = true }) 
   }
 
   function showDayPreview(date) {
+    const dateStr = date.toISOString().split('T')[0];
+    const dateLabel = Utils.formatDate(dateStr);
     const dayEvents = getEventsForDate(date);
     const dayTasks = getTasksForDate(date);
-    if (dayEvents.length === 0 && dayTasks.length === 0) {
-      showModal(Utils.formatDate(date.toISOString()), '<p style="color:var(--text-muted)">Sin actividades este día</p>', [
-        { label: 'Cerrar', class: 'btn btn-secondary', action: c => c() }
-      ]);
-      return;
-    }
+
     let html = '';
-    if (dayEvents.length > 0) {
-      html += '<strong style="font-size:var(--text-sm)">Eventos</strong>';
-      html += '<div style="margin:8px 0 12px;display:flex;flex-direction:column;gap:6px">';
-      dayEvents.forEach(e => {
-        html += `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--surface-secondary);border-radius:var(--radius-md);cursor:pointer" class="calendar-nav-item" data-type="event" data-id="${e.id}" data-project="${e.projectId || ''}">`;
-        html += `<span class="calendar-event ${e.type || 'publication'}" style="padding:2px 8px">${Utils.sanitize(Utils.statusLabel(e.type || 'publication'))}</span>`;
-        html += `<span style="font-size:var(--text-sm)">${Utils.sanitize(e.title)}</span>`;
+    if (dayEvents.length === 0 && dayTasks.length === 0) {
+      html = '<p style="color:var(--text-muted);margin-bottom:12px">Sin actividades este día</p>';
+    } else {
+      if (dayEvents.length > 0) {
+        html += '<strong style="font-size:var(--text-sm)">Eventos</strong>';
+        html += '<div style="margin:8px 0 12px;display:flex;flex-direction:column;gap:6px">';
+        dayEvents.forEach(e => {
+          html += `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--surface-secondary);border-radius:var(--radius-md);cursor:pointer" class="calendar-nav-item" data-type="event" data-id="${e.id}" data-project="${e.projectId || ''}">`;
+          html += `<span class="calendar-event ${e.type || 'publication'}" style="padding:2px 8px">${Utils.sanitize(Utils.statusLabel(e.type || 'publication'))}</span>`;
+          html += `<span style="font-size:var(--text-sm)">${Utils.sanitize(e.title)}</span>`;
+          html += '</div>';
+        });
         html += '</div>';
-      });
-      html += '</div>';
-    }
-    if (dayTasks.length > 0) {
-      html += '<strong style="font-size:var(--text-sm)">Tareas con vencimiento</strong>';
-      html += '<div style="margin:8px 0 0;display:flex;flex-direction:column;gap:6px">';
-      dayTasks.forEach(t => {
-        html += `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--surface-secondary);border-radius:var(--radius-md);cursor:pointer" class="calendar-nav-item" data-type="task" data-id="${t.id}" data-project="${t.projectId || ''}" data-workspace="${t.workspace || ''}">`;
-        html += `<span class="widget-bullet ${t.status}"></span>`;
-        html += `<span style="font-size:var(--text-sm)">${Utils.truncate(Utils.sanitize(t.title), 50)}</span>`;
+      }
+      if (dayTasks.length > 0) {
+        html += '<strong style="font-size:var(--text-sm)">Tareas con vencimiento</strong>';
+        html += '<div style="margin:8px 0 0;display:flex;flex-direction:column;gap:6px">';
+        dayTasks.forEach(t => {
+          html += `<div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--surface-secondary);border-radius:var(--radius-md);cursor:pointer" class="calendar-nav-item" data-type="task" data-id="${t.id}" data-project="${t.projectId || ''}" data-workspace="${t.workspace || ''}">`;
+          html += `<span class="widget-bullet ${t.status}"></span>`;
+          html += `<span style="font-size:var(--text-sm)">${Utils.truncate(Utils.sanitize(t.title), 50)}</span>`;
+          html += '</div>';
+        });
         html += '</div>';
-      });
-      html += '</div>';
+      }
     }
-    showModal(Utils.formatDate(date.toISOString()), html, [
+
+    html += '<hr style="margin:12px 0;border-color:var(--border)">';
+    html += `<button class="btn btn-secondary btn-sm" id="calAddTaskBtn" style="width:100%"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Agregar tarea para este día</button>`;
+
+    showModal(dateLabel, html, [
       { label: 'Cerrar', class: 'btn btn-secondary', action: c => { c(); } }
     ]);
+
     setTimeout(() => {
       document.querySelectorAll('.calendar-nav-item').forEach(el => {
         el.addEventListener('click', () => {
@@ -101,7 +108,63 @@ export function CalendarGrid({ events, tasks, onNavigate, showSidebar = true }) 
           if (onNavigate) onNavigate(type, id, projectId, workspace);
         });
       });
+      document.getElementById('calAddTaskBtn')?.addEventListener('click', () => {
+        showAddTaskForDate(dateStr);
+      });
     }, 50);
+  }
+
+  function showAddTaskForDate(dateStr) {
+    const projects = DB.getAll('projects').filter(p => !p.archived);
+
+    const projectOptions = projects.map(p =>
+      `<option value="${p.id}">${Utils.sanitize(p.name)}</option>`
+    ).join('');
+
+    showModal('Nueva tarea — ' + Utils.formatDate(dateStr), `
+      <div class="form-group"><label>Título *</label><input type="text" id="calTaskTitle" class="form-input" autofocus></div>
+      <div class="form-group"><label>Descripción</label><textarea id="calTaskDesc" class="form-input" rows="2"></textarea></div>
+      <div class="form-group"><label>Dificultad</label><select id="calTaskDifficulty" class="form-input">
+        <option value="easy">Fácil (+15 XP)</option>
+        <option value="medium" selected>Media (+35 XP)</option>
+        <option value="hard">Difícil (+80 XP)</option>
+        <option value="epic">Épica (+160 XP)</option>
+      </select></div>
+      <div class="form-group"><label>Fecha de vencimiento</label><input type="date" id="calTaskDueDate" class="form-input" value="${dateStr}"></div>
+      <div class="form-group"><label>¿Dónde?</label><select id="calTaskScope" class="form-input">
+        <option value="personal">📋 Personal</option>
+        ${projectOptions}
+      </select></div>
+    `, [
+      { label: 'Cancelar', class: 'btn btn-secondary', action: c => c() },
+      { label: 'Crear', class: 'btn btn-primary', action: c => {
+        const title = document.getElementById('calTaskTitle').value.trim();
+        if (!title) {
+          showToast('El título es obligatorio', 'warning');
+          return;
+        }
+        const scope = document.getElementById('calTaskScope').value;
+        const isPersonal = scope === 'personal';
+        const project = isPersonal ? null : DB.getById('projects', scope);
+        const submitBtn = document.querySelector('[data-modal-btn]:last-child')?.querySelector('button');
+        if (submitBtn) submitBtn.disabled = true;
+
+        DB.create('tasks', {
+          title,
+          description: document.getElementById('calTaskDesc').value.trim(),
+          difficulty: document.getElementById('calTaskDifficulty').value,
+          dueDate: document.getElementById('calTaskDueDate').value || null,
+          status: 'todo',
+          workspace: isPersonal ? 'personal' : 'client',
+          projectId: isPersonal ? null : scope,
+          clientId: isPersonal ? null : (project?.clientId || null),
+          objectiveId: null
+        });
+        showToast('Tarea creada', 'success');
+        c();
+        reRender();
+      }}
+    ]);
   }
 
   function renderPreview(date) {
