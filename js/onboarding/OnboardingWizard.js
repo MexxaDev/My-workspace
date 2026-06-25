@@ -19,7 +19,7 @@ const TIPS = {
 const TOUR_STEPS = [
   { target: '#sidebar .sidebar-logo', text: 'Este es tu panel de navegación. Accedé a Dashboard, Personal, Clientes y más.' },
   { target: '#quickCaptureFab', text: 'Usá este botón (o Ctrl+K) para crear tareas, notas o clientes al instante.' },
-  { target: '.dashboard-widget', text: 'Acá ves tu progreso: nivel, XP, racha y las tareas del día. ¡Cada acción suma!' }
+  { target: '.dashboard-widget', text: 'Acá ves las tareas del día y un resumen de tu actividad.' }
 ];
 
 let currentStep = 0;

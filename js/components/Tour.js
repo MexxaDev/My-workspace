@@ -14,7 +14,7 @@ const STEPS = [
   {
     target: '#content .dashboard-widget:first-child',
     title: '📊 Tu progreso',
-    text: 'En el Dashboard ves tu nivel, XP, racha y las Misiones del día. Completá misiones y tareas para subir de nivel y desbloquear logros.'
+    text: 'En el Dashboard ves las Misiones del día y un resumen de tu actividad.'
   }
 ];
 

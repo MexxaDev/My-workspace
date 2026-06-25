@@ -542,18 +542,13 @@ export function ProjectDetailPage(params) {
               <div class="kanban-items" id="kanban-${col}">
                 ${colTasks.map(t => {
                   const obj = t.objectiveId ? DB.getById('objectives', t.objectiveId) : null;
-                  const diff = t.difficulty || 'medium';
-                  const diffXp = DB.getXpForDifficulty(diff);
                   return `
-                  <div class="kanban-item ${t.status === 'finalized' ? 'finalized' : ''}" draggable="${t.status !== 'finalized'}" data-task-id="${t.id}">
+                  <div class="kanban-item" draggable="true" data-task-id="${t.id}">
                     <div class="kanban-item-title">${Utils.sanitize(t.title)}</div>
                     ${obj ? `<div class="kanban-item-obj"><span class="objective-dot objective-${obj.status}"></span>${Utils.truncate(Utils.sanitize(obj.title), 30)}</div>` : ''}
                     ${t.description ? `<div class="kanban-item-desc">${Utils.truncate(Utils.sanitize(t.description), 50)}</div>` : ''}
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
-                      <span style="font-size:10px;color:var(--accent);font-weight:600">+${diffXp} XP</span>
                       <div style="display:flex;gap:6px;align-items:center">
-                        ${t.status === 'done' ? `<button class="btn btn-sm btn-finalize" data-id="${t.id}">✓ Finalizar</button>` : ''}
-                        ${t.status === 'finalized' ? `<span class="finalized-badge">✓ Finalizado</span>` : ''}
                         <button class="btn btn-sm btn-ghost task-del-btn" data-id="${t.id}">✕</button>
                       </div>
                     </div>
@@ -794,7 +789,7 @@ export function ProjectDetailPage(params) {
       showModal('Nueva Tarea', `
       <div class="form-group"><label>Título</label><input type="text" id="taskTitle" class="form-input" autofocus></div>
       <div class="form-group"><label>Descripción</label><textarea id="taskDesc" class="form-input" rows="2"></textarea></div>
-      <div class="form-group"><label>Dificultad</label><select id="taskDifficulty" class="form-input"><option value="easy">Fácil (+10 XP)</option><option value="medium" selected>Media (+25 XP)</option><option value="hard">Difícil (+50 XP)</option><option value="epic">Épica (+100 XP)</option></select></div>
+      <div class="form-group"><label>Dificultad</label><select id="taskDifficulty" class="form-input"><option value="easy">Fácil</option><option value="medium" selected>Media</option><option value="hard">Difícil</option><option value="epic">Épica</option></select></div>
       <div class="form-group"><label>Fecha de vencimiento</label><input type="date" id="taskDueDate" class="form-input"></div>
       <div class="form-group"><label>Objetivo vinculado</label><select id="taskObjective" class="form-input"><option value="">Sin objetivo</option>${getObjectivesOptions()}</select></div>
     `, [
@@ -1039,9 +1034,6 @@ export function ProjectDetailPage(params) {
             e.stopPropagation();
             confirmDelete('tarea', () => { DB.remove('tasks', el.dataset.id); reRender(); });
           });
-        });
-        document.querySelectorAll('.btn-finalize').forEach(el => {
-          el.addEventListener('click', (e) => { e.stopPropagation(); DB.finalizeTask(el.dataset.id); reRender(); });
         });
         document.querySelectorAll('.file-del-btn').forEach(el => {
           el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('files', el.dataset.id); reRender(); });

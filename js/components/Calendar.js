@@ -125,10 +125,10 @@ export function CalendarGrid({ events, tasks, onNavigate, showSidebar = true }) 
       <div class="form-group"><label>Título *</label><input type="text" id="calTaskTitle" class="form-input" autofocus></div>
       <div class="form-group"><label>Descripción</label><textarea id="calTaskDesc" class="form-input" rows="2"></textarea></div>
       <div class="form-group"><label>Dificultad</label><select id="calTaskDifficulty" class="form-input">
-        <option value="easy">Fácil (+15 XP)</option>
-        <option value="medium" selected>Media (+35 XP)</option>
-        <option value="hard">Difícil (+80 XP)</option>
-        <option value="epic">Épica (+160 XP)</option>
+        <option value="easy">Fácil</option>
+        <option value="medium" selected>Media</option>
+        <option value="hard">Difícil</option>
+        <option value="epic">Épica</option>
       </select></div>
       <div class="form-group"><label>Fecha de vencimiento</label><input type="date" id="calTaskDueDate" class="form-input" value="${dateStr}"></div>
       <div class="form-group"><label>¿Dónde?</label><select id="calTaskScope" class="form-input">

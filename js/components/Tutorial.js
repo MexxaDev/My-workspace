@@ -1,6 +1,5 @@
 import { DB } from '../db.js';
 import { Sound } from '../sound.js';
-import { showLevelUpCelebration } from './LevelUpCelebration.js';
 
 const GOAL_TYPES = [
   { id: 'career', label: 'Carrera', icon: '💼' },
@@ -98,15 +97,14 @@ function stepMissions() {
         <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
       </svg>
       <h2>🎯 Misiones diarias</h2>
-      <p style="margin-bottom:12px">Cada día recibirás 5 misiones para mantener el foco. Completalas y ganá XP extra.</p>
+      <p style="margin-bottom:12px">Cada día recibirás 5 misiones para mantener el foco.</p>
       <div style="text-align:left;background:var(--surface-secondary);border-radius:var(--radius-lg);padding:12px;width:100%">
-        <div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></span> Iniciar sesión (+10 XP)</div>
-        <div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></span> Completar 3 tareas (+25 XP)</div>
-        <div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></span> Revisar proyectos activos (+15 XP)</div>
-        <div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></span> Agregar 1 nota (+15 XP)</div>
-        <div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></span> Misión rotativa diaria (+20 XP)</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></span> Iniciar sesión</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></span> Completar 3 tareas</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></span> Revisar proyectos activos</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></span> Agregar 1 nota</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0"><span style="width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0"></span> Misión rotativa diaria</div>
       </div>
-      <p style="font-size:var(--text-xs);color:var(--text-muted);margin-top:10px">Completá todas para bonus de +50 XP. Las rachas de 7 y 30 días dan aún más.</p>
     </div>
   `;
 }
@@ -150,7 +148,6 @@ function stepCelebration() {
       </svg>
       <h2>Todo listo para arrancar</h2>
       <p>Creaste tu Meta y primer Proyecto.</p>
-      <p style="font-size:var(--text-sm);color:var(--text-muted);margin-top:8px">Al finalizar, recibirás XP para alcanzar el Nivel 1.</p>
     </div>
   `;
 }
@@ -214,11 +211,8 @@ function clickNext() {
 
 function finishTutorial() {
   const profile = DB.getProfile();
-  profile.xp += 100;
-  profile.level = 1;
   profile.tutorialCompleted = true;
   DB.saveProfile(profile);
-  DB.createHistoryEntry('level_up', 'user', '', { level: 1 });
   DB.createHistoryEntry('tutorial_complete', 'user', '', {});
 
   const container = document.getElementById('tutorialContainer');
@@ -233,7 +227,6 @@ function finishTutorial() {
 
   setTimeout(() => {
     container.remove();
-    showLevelUpCelebration({ name: profile.name, level: 1 });
   }, 500);
 }
 
@@ -251,7 +244,7 @@ function renderTutorial() {
         <div class="onboarding-footer">
           ${currentStep === 1 ? '<button class="btn btn-ghost" id="tutSkipBtn">Skip</button>' : '<div></div>'}
           <button class="btn btn-primary" id="tutNextBtn" ${canProceed() ? '' : 'disabled'}>
-            ${currentStep === 0 ? 'Comenzar' : currentStep === 4 ? 'Siguiente →' : currentStep === 5 ? 'Recibir recompensa ✨' : 'Siguiente →'}
+            ${currentStep === 0 ? 'Comenzar' : currentStep === 4 ? 'Siguiente →' : currentStep === 5 ? 'Finalizar' : 'Siguiente →'}
           </button>
         </div>
       </div>

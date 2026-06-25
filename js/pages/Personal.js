@@ -38,15 +38,12 @@ export function PersonalPage(initialTab) {
   function renderHeader() {
     const tasks = getPersonalTasks();
     const projects = getPersonalProjects();
-    const profile = DB.getProfile();
     return `
       <div class="welcome-section">
         <h1>Workspace Personal</h1>
         <p style="display:flex;gap:16px;flex-wrap:wrap">
           <span>${projects.length} proyectos</span>
           <span>${tasks.length} tareas</span>
-          <span>Nivel ${profile.level}</span>
-          <span>🔥 ${profile.streak} días</span>
         </p>
       </div>
     `;
@@ -77,7 +74,6 @@ export function PersonalPage(initialTab) {
           <div class="stat-card"><div class="stat-label">Proyectos activos</div><div class="stat-value">${activeProjects.length}</div></div>
           <div class="stat-card"><div class="stat-label">Tareas pendientes</div><div class="stat-value">${pendingTasks.length}</div></div>
           <div class="stat-card"><div class="stat-label">Notas</div><div class="stat-value">${notes.length}</div></div>
-          <div class="stat-card"><div class="stat-label">Nivel</div><div class="stat-value">${DB.getProfile().level}</div></div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
@@ -163,18 +159,13 @@ export function PersonalPage(initialTab) {
                 <div class="kanban-items">
                   ${colTasks.map(t => {
                     const obj = t.objectiveId ? DB.getById('objectives', t.objectiveId) : null;
-                    const diff = t.difficulty || 'medium';
-                    const diffXp = { easy: 10, medium: 25, hard: 50, epic: 100 }[diff];
                     return `
-                    <div class="kanban-item ${t.status === 'finalized' ? 'finalized' : ''}" draggable="${t.status !== 'finalized'}" data-task-id="${t.id}">
+                    <div class="kanban-item" draggable="true" data-task-id="${t.id}">
                       <div class="kanban-item-title">${Utils.sanitize(t.title)}</div>
                       ${obj ? `<div class="kanban-item-obj"><span class="objective-dot objective-${obj.status}"></span>${Utils.truncate(Utils.sanitize(obj.title), 30)}</div>` : ''}
                       ${t.description ? `<div class="kanban-item-desc">${Utils.truncate(Utils.sanitize(t.description), 50)}</div>` : ''}
                       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
-                        <span style="font-size:10px;color:var(--accent);font-weight:600">+${diffXp} XP</span>
                         <div style="display:flex;gap:6px;align-items:center">
-                          ${t.status === 'done' ? `<button class="btn btn-sm personal-btn-finalize" data-id="${t.id}">✓ Finalizar</button>` : ''}
-                          ${t.status === 'finalized' ? `<span class="finalized-badge">✓ Finalizado</span>` : ''}
                           <button class="btn btn-sm btn-ghost personal-task-del-btn" data-id="${t.id}">✕</button>
                         </div>
                       </div>
@@ -287,10 +278,10 @@ export function PersonalPage(initialTab) {
       <div class="form-group"><label>Título *</label><input type="text" id="ptTitle" class="form-input" autofocus></div>
       <div class="form-group"><label>Descripción</label><textarea id="ptDesc" class="form-input" rows="2"></textarea></div>
       <div class="form-group"><label>Dificultad</label><select id="ptDifficulty" class="form-input">
-        <option value="easy">Fácil (+10 XP)</option>
-        <option value="medium" selected>Media (+25 XP)</option>
-        <option value="hard">Difícil (+50 XP)</option>
-        <option value="epic">Épica (+100 XP)</option>
+        <option value="easy">Fácil</option>
+        <option value="medium" selected>Media</option>
+        <option value="hard">Difícil</option>
+        <option value="epic">Épica</option>
       </select></div>
       <div class="form-group"><label>Fecha de vencimiento</label><input type="date" id="ptDueDate" class="form-input"></div>
       <div class="form-group"><label>Objetivo vinculado</label><select id="ptObjective" class="form-input"><option value="">Sin objetivo</option>${getPersonalObjectiveOptions()}</select></div>
@@ -391,9 +382,6 @@ export function PersonalPage(initialTab) {
 
         document.querySelectorAll('.personal-task-del-btn').forEach(el => {
           el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('tasks', el.dataset.id); reRender(); });
-        });
-        document.querySelectorAll('.personal-btn-finalize').forEach(el => {
-          el.addEventListener('click', (e) => { e.stopPropagation(); DB.finalizeTask(el.dataset.id); reRender(); });
         });
         document.querySelectorAll('.personal-note-del-btn').forEach(el => {
           el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('notes', el.dataset.id); reRender(); });

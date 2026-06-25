@@ -1,4 +1,4 @@
-import { DB, OCCUPATIONS } from '../db.js';
+import { DB } from '../db.js';
 import { Utils } from '../utils.js';
 import { router } from '../router.js';
 import { CalendarGrid } from '../components/Calendar.js';
@@ -18,15 +18,13 @@ export function DashboardPage() {
     const events = DB.getAll('events');
     const history = DB.getAll('history');
     const profile = DB.getProfile();
-    const xpInfo = DB.getXPToNextLevel();
 
     const activeProjects = projects.filter(p => !p.archived && p.status === 'active');
     const pendingTasks = tasks.filter(t => t.status === 'todo' || t.status === 'in_progress');
     const todayTasks = DB.getTasksDueToday();
-    const finalizedTasks = tasks.filter(t => t.status === 'finalized').sort((a, b) => new Date(b.finalizedAt || b.createdAt) - new Date(a.finalizedAt || a.createdAt));
 
     return {
-      profile, xpInfo, activeProjects, pendingTasks, todayTasks, finalizedTasks,
+      profile, activeProjects, pendingTasks, todayTasks,
       recentHistory: history.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5),
       tasks, projects, events
     };
@@ -45,18 +43,6 @@ export function DashboardPage() {
     return `<p style="color:var(--text-muted);padding:8px 0;font-size:var(--text-sm)">${msg || 'Sin datos'}</p>`;
   }
 
-  function renderLevelBar(xpInfo) {
-    return `
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="font-size:var(--text-lg);font-weight:800;color:var(--accent);white-space:nowrap">Nv. ${xpInfo.level}</span>
-        <div class="progress-bar" style="flex:1;height:6px;background:var(--surface-secondary);min-width:60px">
-          <div class="progress-fill" style="width:${xpInfo.percent}%;background:var(--accent);height:6px;border-radius:3px"></div>
-        </div>
-        <span style="font-size:var(--text-xs);color:var(--text-muted);white-space:nowrap">${xpInfo.current}/${xpInfo.needed} XP</span>
-      </div>
-    `;
-  }
-
   return {
     render() {
       const d = getData();
@@ -72,14 +58,7 @@ export function DashboardPage() {
               </div>
               <div>
                 <div style="font-weight:700;font-size:var(--text-base);letter-spacing:-0.02em">${getGreeting()}, ${Utils.sanitize(p.name)}</div>
-                <div style="font-size:var(--text-xs);color:var(--text-muted);display:flex;gap:12px;margin-top:2px">
-                  <span>🔥 ${p.streak || 0} días</span>
-                  <span>Nv. ${p.level}</span>
-                </div>
               </div>
-            </div>
-            <div style="flex:1;min-width:160px">
-              ${renderLevelBar({ ...d.xpInfo, level: p.level })}
             </div>
           </div>
 
@@ -96,10 +75,6 @@ export function DashboardPage() {
               <div class="kpi-card-value">${d.todayTasks.length}</div>
               <div class="kpi-card-label">Vencen hoy</div>
             </div>
-            <div class="kpi-card">
-              <div class="kpi-card-value">${d.finalizedTasks.length}</div>
-              <div class="kpi-card-label">Finalizadas</div>
-            </div>
           </div>
 
           <div class="dashboard-grid">
@@ -108,7 +83,6 @@ export function DashboardPage() {
             ${widget('Misiones de hoy', '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>', `
               ${d.todayTasks.length > 0 ? d.todayTasks.map(t => {
                 const proj = t.projectId ? DB.getById('projects', t.projectId) : null;
-                const diffXp = { easy: 10, medium: 25, hard: 50, epic: 100 }[t.difficulty] || 25;
                 return `
                   <div class="widget-item" style="justify-content:space-between">
                     <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
@@ -116,7 +90,6 @@ export function DashboardPage() {
                       <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${Utils.truncate(Utils.sanitize(t.title), 40)}</span>
                       ${proj ? `<span style="font-size:var(--text-xs);color:var(--text-muted);flex-shrink:0">· ${Utils.sanitize(proj.name)}</span>` : ''}
                     </div>
-                    <span style="font-size:var(--text-xs);color:var(--accent);font-weight:600;flex-shrink:0">+${diffXp} XP</span>
                   </div>
                 `;
               }).join('') : empty('Sin tareas para hoy')}
@@ -143,22 +116,6 @@ export function DashboardPage() {
                 </div>
               `).join('') : empty('Sin actividad reciente')}
             `, 'history-widget')}
-
-            ${widget('Últimas finalizadas', '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>', `
-              ${d.finalizedTasks.length > 0 ? d.finalizedTasks.slice(0, 5).map(t => {
-                const proj = t.projectId ? DB.getById('projects', t.projectId) : null;
-                return `
-                  <div class="widget-item">
-                    <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
-                      <span class="widget-bullet finalized"></span>
-                      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${Utils.truncate(Utils.sanitize(t.title), 35)}</span>
-                      ${proj ? `<span style="font-size:var(--text-xs);color:var(--text-muted);flex-shrink:0">· ${Utils.sanitize(proj.name)}</span>` : ''}
-                    </div>
-                    <span style="font-size:var(--text-xs);color:var(--text-muted);flex-shrink:0">${Utils.getRelativeTime(t.finalizedAt || t.createdAt)}</span>
-                  </div>
-                `;
-              }).join('') : empty('Aún no hay tareas finalizadas')}
-            `, 'finalized-widget')}
           </div>
         </div>
       `;

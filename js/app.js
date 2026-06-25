@@ -15,7 +15,6 @@ import { SettingsPage } from './pages/Settings.js';
 import { initQuickCapture } from './components/QuickCapture.js';
 import { showOnboarding } from './onboarding/OnboardingWizard.js';
 import { startTutorial } from './components/Tutorial.js';
-import { showDailyCheckIn } from './components/DailyCheckIn.js';
 
 const APP_VERSION = '2.0.0';
 
@@ -40,8 +39,6 @@ function renderPage(page) {
   const profile = DB.getProfile();
   if (!profile.tutorialCompleted && window.location.hash.replace(/^#/, '') === '/') {
     setTimeout(() => startTutorial(), 400);
-  } else if (profile.tutorialCompleted) {
-    setTimeout(() => showDailyCheckIn(), 600);
   }
 }
 

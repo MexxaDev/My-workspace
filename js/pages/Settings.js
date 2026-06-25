@@ -15,89 +15,9 @@ export function SettingsPage() {
     showToast('Perfil guardado', 'success');
   }
 
-  function renderXPBar(xpInfo) {
-    return `
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
-        <span style="font-size:var(--text-xl);font-weight:800;color:var(--accent)">${xpInfo.percent}%</span>
-        <div class="progress-bar" style="flex:1;height:10px;background:var(--surface-secondary);border-radius:8px;overflow:hidden">
-          <div class="progress-fill" style="width:${xpInfo.percent}%;background:linear-gradient(90deg,var(--accent),var(--accent-hover));height:10px;border-radius:8px;transition:width 0.6s ease"></div>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:var(--text-xs);color:var(--text-muted)">
-        <span>${xpInfo.current} / ${xpInfo.needed} XP</span>
-        <span>Nivel ${xpInfo.level + 1} → ${xpInfo.needed - xpInfo.current} XP restantes</span>
-      </div>
-    `;
-  }
-
-  function renderStreakCalendar(streak) {
-    const days = [];
-    const today = new Date();
-    for (let i = 27; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      days.push(d.toISOString().split('T')[0]);
-    }
-    const dayLabels = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
-    const todayStr = Utils.today();
-    let html = '<div style="display:flex;gap:3px;flex-wrap:wrap;justify-content:center">';
-    days.forEach((dateStr, idx) => {
-      const isToday = dateStr === todayStr;
-      const activity = localStorage.getItem(`levitar_activity_${dateStr}`);
-      const classes = isToday ? 'streak-today' : (activity ? 'streak-active' : 'streak-inactive');
-      const checkSvg = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
-      html += `<div class="${classes}" title="${Utils.formatDate(dateStr)}" style="width:22px;height:22px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;${activity ? 'background:var(--success);color:white' : 'background:var(--surface-secondary);color:var(--text-muted)'}">${activity ? checkSvg : dayLabels[(idx + (new Date(dateStr)).getDay()) % 7]}</div>`;
-    });
-    html += '</div>';
-    return html;
-  }
-
-  function renderAchievements(achievements) {
-    const ACHIEVEMENT_ICONS = {
-      streak_7: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z"/></svg>',
-      streak_30: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>',
-      level_5: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
-      level_10: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
-    };
-
-    const allAchievements = [
-      { id: 'streak_7', name: 'Racha de 7 días', icon: ACHIEVEMENT_ICONS.streak_7, desc: 'Completá tareas 7 días seguidos' },
-      { id: 'streak_30', name: 'Racha de 30 días', icon: ACHIEVEMENT_ICONS.streak_30, desc: 'Completá tareas 30 días seguidos' },
-      { id: 'level_5', name: 'Nivel 5', icon: ACHIEVEMENT_ICONS.level_5, desc: 'Alcanzá el nivel 5' },
-      { id: 'level_10', name: 'Nivel 10', icon: ACHIEVEMENT_ICONS.level_10, desc: 'Alcanzá el nivel 10' }
-    ];
-
-    const unlockedIds = new Set(achievements.map(a => a.id));
-
-    return allAchievements.map(a => {
-      const unlocked = unlockedIds.has(a.id);
-      const achievement = achievements.find(x => x.id === a.id);
-      return `
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;opacity:${unlocked ? 1 : 0.35};border-bottom:1px solid var(--border)">
-          <span style="width:20px;height:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0">${a.icon}</span>
-          <div style="flex:1">
-            <div style="font-weight:600;font-size:var(--text-sm)">${a.name}</div>
-            <div style="font-size:var(--text-xs);color:var(--text-muted)">${unlocked ? `Desbloqueado ${achievement.unlockedAt ? Utils.formatDate(achievement.unlockedAt) : ''}` : a.desc}</div>
-          </div>
-          <span style="font-size:var(--text-xs);color:${unlocked ? 'var(--success)' : 'var(--text-muted)'}">
-            ${unlocked
-              ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
-              : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>'
-            }
-          </span>
-        </div>
-      `;
-    }).join('');
-  }
-
   return {
     render() {
       const profile = DB.getProfile();
-      const xpInfo = DB.getXPToNextLevel();
-      const tasks = DB.getAll('tasks');
-      const doneTasks = tasks.filter(t => t.status === 'done').length;
-      const achievements = profile.achievements || [];
-      const streakInfo = DB.getStreakInfo();
 
       return `
         <div class="page-enter" style="max-width:640px">
@@ -140,54 +60,6 @@ export function SettingsPage() {
                   </div>
                 </div>
                 <button class="btn btn-primary" id="saveProfileBtn" style="margin-top:8px">Guardar perfil</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-section">
-            <h3>Progreso & Gamificación</h3>
-
-            <div class="stats-grid-4col">
-              <div class="card" style="text-align:center;padding:12px">
-                <div style="font-size:var(--text-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Nivel</div>
-                <div style="font-size:var(--text-2xl);font-weight:800;color:var(--accent)">${profile.level}</div>
-              </div>
-              <div class="card" style="text-align:center;padding:12px">
-                <div style="font-size:var(--text-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">XP</div>
-                <div style="font-size:var(--text-2xl);font-weight:800;color:var(--accent)">${profile.xp}</div>
-              </div>
-              <div class="card" style="text-align:center;padding:12px">
-                <div style="font-size:var(--text-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Racha <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z"/></svg></div>
-                <div style="font-size:var(--text-2xl);font-weight:800;color:var(--warning)">${profile.streak}</div>
-              </div>
-              <div class="card" style="text-align:center;padding:12px">
-                <div style="font-size:var(--text-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Completadas</div>
-                <div style="font-size:var(--text-2xl);font-weight:800;color:var(--success)">${doneTasks}</div>
-              </div>
-            </div>
-
-            <div class="card" style="margin-bottom:16px">
-              <div class="card-body">
-                <div style="font-weight:600;font-size:var(--text-sm);margin-bottom:12px">Progreso al siguiente nivel</div>
-                ${renderXPBar({ ...xpInfo, level: profile.level })}
-              </div>
-            </div>
-
-            <div class="card" style="margin-bottom:16px">
-              <div class="card-body">
-                <div style="font-weight:600;font-size:var(--text-sm);margin-bottom:12px">Historial de actividad (28 días)</div>
-                ${renderStreakCalendar(profile.streak)}
-                <div style="display:flex;gap:16px;margin-top:8px;font-size:var(--text-xs);color:var(--text-muted);justify-content:center">
-                  <span><span style="display:inline-block;width:10px;height:10px;background:var(--success);border-radius:2px;vertical-align:middle;margin-right:4px"></span> Activo</span>
-                  <span><span style="display:inline-block;width:10px;height:10px;background:var(--surface-secondary);border-radius:2px;vertical-align:middle;margin-right:4px"></span> Inactivo</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="card">
-              <div class="card-body">
-                <div style="font-weight:600;font-size:var(--text-sm);margin-bottom:12px">Logros (${achievements.length} desbloqueados)</div>
-                ${achievements.length === 0 ? '<p style="color:var(--text-muted);font-size:var(--text-sm)">Completá tareas para desbloquear logros.</p>' : renderAchievements(achievements)}
               </div>
             </div>
           </div>
@@ -250,7 +122,7 @@ export function SettingsPage() {
               <div class="card-body">
                 <p><strong>My Workspace</strong> — Sistema Operativo Personal & Profesional</p>
                 <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:4px">Versión 3.0.0</p>
-                <p style="font-size:var(--text-sm);color:var(--text-muted);margin-top:12px">Metas → Proyectos → Tareas, con gamificación, misiones diarias y enfoque en acción.</p>
+                <p style="font-size:var(--text-sm);color:var(--text-muted);margin-top:12px">Metas → Proyectos → Tareas, con misiones diarias y enfoque en acción.</p>
               </div>
             </div>
           </div>
