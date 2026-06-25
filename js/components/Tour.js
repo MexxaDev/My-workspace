@@ -14,7 +14,7 @@ const STEPS = [
   {
     target: '#content .dashboard-widget:first-child',
     title: '📊 Tu progreso',
-    text: 'En el Dashboard ves las Misiones del día y un resumen de tu actividad.'
+    text: 'En el Dashboard ves un resumen de tu actividad, el calendario y tus proyectos.'
   }
 ];
 

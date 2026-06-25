@@ -6,7 +6,6 @@ import { showToast } from '../components/Toast.js';
 import { CalendarGrid } from '../components/Calendar.js';
 import { initKanbanDrag } from '../components/Kanban.js';
 import { addSwipeTarget } from '../components/SwipeToDelete.js';
-import { DailyMissions } from '../components/DailyMissions.js';
 
 const SECTIONS = [
   { id: 'overview', label: 'Resumen' },
@@ -69,7 +68,6 @@ export function PersonalPage(initialTab) {
 
     return `
       <div class="page-enter" style="margin-top:16px">
-        <div id="dailyMissionsContainer"></div>
         <div class="stat-grid" style="margin-top:16px">
           <div class="stat-card"><div class="stat-label">Proyectos activos</div><div class="stat-value">${activeProjects.length}</div></div>
           <div class="stat-card"><div class="stat-label">Tareas pendientes</div><div class="stat-value">${pendingTasks.length}</div></div>
@@ -386,7 +384,6 @@ export function PersonalPage(initialTab) {
         document.querySelectorAll('.personal-note-del-btn').forEach(el => {
           el.addEventListener('click', (e) => { e.stopPropagation(); DB.remove('notes', el.dataset.id); reRender(); });
         });
-
         initKanbanDrag({
           onStatusChange(taskId, newStatus) {
             if (newStatus === 'done') {
@@ -396,13 +393,6 @@ export function PersonalPage(initialTab) {
             }
           }
         });
-
-        const missionsContainer = document.getElementById('dailyMissionsContainer');
-        if (missionsContainer) {
-          const missions = DailyMissions();
-          missionsContainer.innerHTML = missions.render();
-          missions.afterRender();
-        }
 
         if (activeSection === 'calendar' && document.getElementById('calendarContainer')) {
           const events = getPersonalEvents();

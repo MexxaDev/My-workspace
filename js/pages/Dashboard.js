@@ -2,7 +2,6 @@ import { DB } from '../db.js';
 import { Utils } from '../utils.js';
 import { router } from '../router.js';
 import { CalendarGrid } from '../components/Calendar.js';
-import { DailyMissions } from '../components/DailyMissions.js';
 
 export function DashboardPage() {
   function getGreeting() {
@@ -95,8 +94,6 @@ export function DashboardPage() {
               }).join('') : empty('Sin tareas para hoy')}
             `, 'tasks-widget')}
 
-            ${widget('🎯 Misiones del día', '', '<div id="dailyMissionsContainer"></div>', 'missions-widget')}
-
             ${widget('Proyectos activos', '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>', `
               ${d.activeProjects.length > 0 ? d.activeProjects.slice(0, 5).map(p => `
                 <div class="widget-item widget-clickable" data-nav="${p.clientId ? `/clients/${p.clientId}/projects/${p.id}` : `/personal/projects/${p.id}`}">
@@ -122,31 +119,6 @@ export function DashboardPage() {
     },
     afterRender() {
       const container = document.getElementById('calendarContainer');
-      if (container) {
-        const events = DB.getAll('events');
-        const tasks = DB.getAll('tasks');
-        const cal = CalendarGrid({
-          events,
-          tasks,
-          showSidebar: false,
-          onNavigate: (type, id, projectId) => {
-            if (type === 'event') {
-              router.navigate('/personal');
-            } else {
-              router.navigate(projectId ? `/personal/projects/${projectId}` : '/personal/tasks');
-            }
-          }
-        });
-        container.innerHTML = cal.render();
-        cal.afterRender();
-      }
-
-      const missionsContainer = document.getElementById('dailyMissionsContainer');
-      if (missionsContainer) {
-        const missions = DailyMissions();
-        missionsContainer.innerHTML = missions.render();
-        missions.afterRender();
-      }
 
       document.querySelectorAll('[data-nav]').forEach(el => {
         el.addEventListener('click', () => router.navigate(el.dataset.nav));

@@ -122,7 +122,7 @@ export function SettingsPage() {
               <div class="card-body">
                 <p><strong>My Workspace</strong> — Sistema Operativo Personal & Profesional</p>
                 <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-top:4px">Versión 3.0.0</p>
-                <p style="font-size:var(--text-sm);color:var(--text-muted);margin-top:12px">Metas → Proyectos → Tareas, con misiones diarias y enfoque en acción.</p>
+                <p style="font-size:var(--text-sm);color:var(--text-muted);margin-top:12px">Metas → Proyectos → Tareas, con enfoque en acción.</p>
               </div>
             </div>
           </div>
