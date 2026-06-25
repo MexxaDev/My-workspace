@@ -119,6 +119,24 @@ export function DashboardPage() {
     },
     afterRender() {
       const container = document.getElementById('calendarContainer');
+      if (container) {
+        const events = DB.getAll('events');
+        const tasks = DB.getAll('tasks');
+        const cal = CalendarGrid({
+          events,
+          tasks,
+          showSidebar: false,
+          onNavigate: (type, id, projectId) => {
+            if (type === 'event') {
+              router.navigate('/personal');
+            } else {
+              router.navigate(projectId ? `/personal/projects/${projectId}` : '/personal/tasks');
+            }
+          }
+        });
+        container.innerHTML = cal.render();
+        cal.afterRender();
+      }
 
       document.querySelectorAll('[data-nav]').forEach(el => {
         el.addEventListener('click', () => router.navigate(el.dataset.nav));
